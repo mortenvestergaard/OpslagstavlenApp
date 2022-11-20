@@ -112,7 +112,7 @@ public class MainActivity extends AppCompatActivity {
         //String builtUrl = urlBuilder.build().toString();
 
         Request request = new Request.Builder()
-                .url(postUrl + "Image/PostImage")
+                .url(postUrl + "Image/PostImage?imageString=" + postBody)
                 .post(body)
                 .build();
 
