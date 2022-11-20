@@ -1,68 +1,143 @@
 package com.example.opslagstavlenapp;
 
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.provider.MediaStore;
-import android.view.MotionEvent;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+//OK Http3
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+
+import java.io.IOException;
+
 
 public class MainActivity extends AppCompatActivity {
+    Button CameraButton;
+    ImageView PictureView;
+    TextView txtString;
+    Button GetImageButton;
+    public static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
 
-    ImageView imageView;
-    Button button;
+    OkHttpClient client = new OkHttpClient();
+    public String apiUrl = "http://192.168.0.12/api/";
+
+    public static final int RequestPermissionCode = 1;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        CameraButton = findViewById(R.id.CameraButton);
+        PictureView = findViewById(R.id.PictureView);
+        GetImageButton = findViewById(R.id.GetImagesButton);
+        EnableRuntimePermission();
+        CameraButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+                startActivityForResult(intent, 7);
+            }
 
-        imageView = (ImageView)findViewById(R.id.iv_activity_main);
-        button = (Button)findViewById(R.id.CameraButton);
 
-        if(ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED){
-            ActivityCompat.requestPermissions(MainActivity.this, new String[]{
-                    Manifest.permission.CAMERA
-            }, 100);
-        }
+        });
 
-        button.setOnClickListener(new View.OnClickListener() {
+        GetImageButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                Intent camButtonIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                try {
+                    run();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+
+    }
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 7 && resultCode == RESULT_OK) {
+            Bitmap bitmap = (Bitmap) data.getExtras().get("data");
+            PictureView.setImageBitmap(bitmap);
+        }
+    }
+
+    public void EnableRuntimePermission(){
+        if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this,
+                Manifest.permission.CAMERA)) {
+            Toast.makeText(MainActivity.this,"CAMERA permission allows us to Access CAMERA app",     Toast.LENGTH_LONG).show();
+        } else {
+            ActivityCompat.requestPermissions(MainActivity.this,new String[]{
+                    Manifest.permission.CAMERA}, RequestPermissionCode);
+        }
+    }
+
+    public void PostRequest(String postUrl, String postBody) throws IOException {
+        OkHttpClient client = new OkHttpClient();
+
+        RequestBody body = RequestBody.create(JSON, postBody);
+
+        Request request = new Request.Builder()
+                .url(postUrl + "image/PostImage")
+                .post(body)
+                .build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                call.cancel();
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+                Log.d("TAG", response.body().string());
+            }
+        });
+    }
+    void run() throws IOException {
+
+        OkHttpClient client = new OkHttpClient();
+
+        Request request = new Request.Builder()
+                .url(apiUrl + "image/GetImages")
+                .build();
+
+        client.newCall(request).enqueue(new Callback() {
+            @Override
+            public void onFailure(Call call, IOException e) {
+                call.cancel();
+            }
+
+            @Override
+            public void onResponse(Call call, Response response) throws IOException {
+
+                final String myResponse = response.body().string();
+
+                MainActivity.this.runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        txtString.setText(myResponse);
+                    }
+                });
 
             }
         });
     }
-
-
-    float x, y;
-    float xx, yy;
-    @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        if (event.getAction() == MotionEvent.ACTION_DOWN) {
-            x = event.getX();
-            y = event.getY();
-        }
-
-        if (event.getAction() == MotionEvent.ACTION_MOVE){
-            xx = event.getX() - x;
-            yy = event.getY() - y;
-            imageView.setX(imageView.getX() + xx);
-            imageView.setY(imageView.getY() + yy);
-
-            x = event.getX();
-            y = event.getY();
-        }
-        return super.onTouchEvent(event);
-    }
-
-
 }
