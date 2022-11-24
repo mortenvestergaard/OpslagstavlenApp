@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.provider.MediaStore;
@@ -28,8 +29,13 @@ import okhttp3.Response;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.List;
 
 
 public class MainActivity extends AppCompatActivity {
@@ -40,6 +46,8 @@ public class MainActivity extends AppCompatActivity {
     public static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     public String apiUrl = "http://192.168.0.10:5158/api/";
     public String takenPicture;
+
+    public List<String> imageList;
 
     OkHttpClient client = new OkHttpClient();
 
@@ -74,6 +82,12 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    /***
+     *
+     * @param requestCode
+     * @param resultCode
+     * @param data
+     */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -92,6 +106,9 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /***
+     *
+     */
     public void EnableRuntimePermission(){
         if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this,
                 Manifest.permission.CAMERA)) {
@@ -102,14 +119,16 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /***
+     *
+     * @param postUrl
+     * @param postBody
+     * @throws IOException
+     */
     public void PostRequest(String postUrl, String postBody) throws IOException {
         OkHttpClient client = new OkHttpClient();
 
         RequestBody body = RequestBody.create(JSON, postBody);
-
-        //.Builder urlBuilder = HttpUrl.parse(apiUrl + "Image/PostImage").newBuilder();
-        //urlBuilder.addQueryParameter("imageString", postBody);
-        //String builtUrl = urlBuilder.build().toString();
 
         Request request = new Request.Builder()
                 .url(postUrl + "Image/PostImage?imageString=" + postBody)
@@ -124,10 +143,15 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onResponse(Call call, Response response) throws IOException {
-                Log.d("TAG", response.body().string());
+
             }
         });
     }
+
+    /***
+     *
+     * @throws IOException
+     */
     void GetRequest() throws IOException {
 
         OkHttpClient client = new OkHttpClient();
@@ -145,15 +169,55 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(Call call, Response response) throws IOException {
 
-                final String myResponse = response.body().string();
+                final String apiResponse = response.body().string();
 
                 MainActivity.this.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
+                        addImagesToList(apiResponse);
+                        addImageViews();
                     }
                 });
 
             }
         });
+    }
+
+    /***
+     *
+     * @param imageString
+     */
+    public void addImagesToList(String imageString) {
+        try {
+            JSONObject object = new JSONObject(imageString);
+            JSONArray array = object.getJSONArray("images");
+            for(int i = 0; i < array.length(); i++) {
+                JSONObject object1 = array.getJSONObject(i);
+                String name = object1.getString("imageBase64");
+                imageList.add(name);
+            }
+        }catch (JSONException e){
+
+        };
+    }
+
+    /***
+     *
+     */
+    public void addImageViews() {
+        for (int i = 0; i < imageList.size(); i++) {
+            PictureView.setImageBitmap(GetBitmapImageFromBase64(imageList.get(i)));
+        }
+    }
+
+    /***
+     *
+     * @param base64String
+     * @return
+     */
+    public Bitmap GetBitmapImageFromBase64(String base64String){
+        byte[] imageBytes = Base64.decode(base64String, Base64.DEFAULT);
+        Bitmap decodedImage = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
+        return decodedImage;
     }
 }
