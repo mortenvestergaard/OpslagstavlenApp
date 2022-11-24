@@ -10,9 +10,12 @@ import android.os.Bundle;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -35,6 +38,7 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.List;
 
 
@@ -42,10 +46,13 @@ public class MainActivity extends AppCompatActivity {
     Button CameraButton;
     ImageView PictureView;
     Button GetImageButton;
+    RelativeLayout Layout;
 
     public static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     public String apiUrl = "http://192.168.0.10:5158/api/";
     public String takenPicture;
+    public int xDelta;
+    public int yDelta;
 
     public List<String> imageList;
 
@@ -60,6 +67,7 @@ public class MainActivity extends AppCompatActivity {
         CameraButton = findViewById(R.id.CameraButton);
         PictureView = findViewById(R.id.PictureView);
         GetImageButton = findViewById(R.id.GetImagesButton);
+        Layout = findViewById(R.id.RelativeImageLayout);
         EnableRuntimePermission();
 
         CameraButton.setOnClickListener(new View.OnClickListener() {
@@ -83,10 +91,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /***
-     *
-     * @param requestCode
-     * @param resultCode
-     * @param data
+     * Called when the Intent for the camera is returned.
+     * @param requestCode Code for checking what intent is being parsed
+     * @param resultCode The result code
+     * @param data The intent
      */
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
@@ -106,9 +114,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    /***
-     *
-     */
+
     public void EnableRuntimePermission(){
         if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this,
                 Manifest.permission.CAMERA)) {
@@ -120,9 +126,9 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /***
-     *
-     * @param postUrl
-     * @param postBody
+     * Post request to the API for posting the picture taken by the camera
+     * @param postUrl The post url to the database
+     * @param postBody Body containing the base64 image taken by the camera
      * @throws IOException
      */
     public void PostRequest(String postUrl, String postBody) throws IOException {
@@ -149,7 +155,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /***
-     *
+     * Get request from the API. Puts each base64 image from the response into a list, converts them to bitmaps
+     * and creates a RelativeLayout with and ImageView for each base64 string
      * @throws IOException
      */
     void GetRequest() throws IOException {
@@ -174,50 +181,62 @@ public class MainActivity extends AppCompatActivity {
                 MainActivity.this.runOnUiThread(new Runnable() {
                     @Override
                     public void run() {
-                        addImagesToList(apiResponse);
-                        addImageViews();
+                        try {
+                            imageList = Arrays.asList(apiResponse.split(","));
+
+                            for (int i = 0; i < imageList.size(); i++) {
+                                Bitmap imageBitMap = GetBitmapImageFromBase64(imageList.get(i));
+                                ImageView imageView = new ImageView(Layout.getContext());
+                                imageView.setImageBitmap(imageBitMap);
+                                RelativeLayout.LayoutParams params = new RelativeLayout.LayoutParams(550, 550);
+                                imageView.setLayoutParams(params);
+                                imageView.setOnTouchListener(onTouchListener());
+                                Layout.addView(imageView);
+                            }
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                        }
                     }
                 });
-
-            }
+                }
         });
     }
 
-    /***
-     *
-     * @param imageString
-     */
-    public void addImagesToList(String imageString) {
-        try {
-            JSONObject object = new JSONObject(imageString);
-            JSONArray array = object.getJSONArray("images");
-            for(int i = 0; i < array.length(); i++) {
-                JSONObject object1 = array.getJSONObject(i);
-                String name = object1.getString("imageBase64");
-                imageList.add(name);
-            }
-        }catch (JSONException e){
-
-        };
-    }
-
-    /***
-     *
-     */
-    public void addImageViews() {
-        for (int i = 0; i < imageList.size(); i++) {
-            PictureView.setImageBitmap(GetBitmapImageFromBase64(imageList.get(i)));
-        }
-    }
-
-    /***
-     *
-     * @param base64String
-     * @return
-     */
     public Bitmap GetBitmapImageFromBase64(String base64String){
         byte[] imageBytes = Base64.decode(base64String, Base64.DEFAULT);
         Bitmap decodedImage = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
         return decodedImage;
+    }
+
+    /***
+     * This method adds an on touch listener to each image view/picture to make them draggable within the Relative layout
+     * @return
+     */
+    private View.OnTouchListener onTouchListener(){
+        return new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View view, MotionEvent motionEvent) {
+                final int x = (int) motionEvent.getRawX();
+                final int y = (int) motionEvent.getRawY();
+                switch (motionEvent.getAction() & MotionEvent.ACTION_MASK){
+                    case MotionEvent.ACTION_DOWN:
+                        RelativeLayout.LayoutParams params = (RelativeLayout.LayoutParams)
+                                view.getLayoutParams();
+                        xDelta = x - params.leftMargin;
+                        yDelta = y - params.topMargin;
+                        break;
+
+                    case MotionEvent.ACTION_MOVE:
+                        RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams) view.getLayoutParams();
+                        layoutParams.leftMargin = x - xDelta;
+                        layoutParams.topMargin = y - yDelta;
+                        layoutParams.rightMargin = 0;
+                        layoutParams.bottomMargin = 0;
+                        view.setLayoutParams(layoutParams);
+
+                }
+                return true;
+            }
+        };
     }
 }

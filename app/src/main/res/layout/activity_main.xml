@@ -34,8 +34,15 @@
             android:layout_height="wrap_content"
             android:text="Clear"/>
 
+
+
     </LinearLayout>
 
+    <RelativeLayout
+        android:id="@+id/RelativeImageLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+    </RelativeLayout>
 
     <ImageView
         android:id="@+id/PictureView"
